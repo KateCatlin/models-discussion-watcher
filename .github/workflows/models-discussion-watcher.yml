@@ -45,13 +45,9 @@ jobs:
             [ -z "$path" ] && continue  # skip blank lines
             number="${path##*/}"
             url="https://github.com${path}"
-
             title=$(curl -sL "$url" | sed -n 's/^[[:space:]]*<title>\(.*\)<\/title>/\1/p' | head -n1)
 
-            answer=$(curl -sL "https://models.github.ai/inference/chat/completions" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -d @- <<EOF | jq -r '.choices[0].message.content' | tr -d '\n'
+            cat > payload.json <<EOF
 {
   "messages": [
     { "role": "system", "content": "Return ONLY YES or NO." },
@@ -60,7 +56,11 @@ jobs:
   "model": "openai/gpt-4o"
 }
 EOF
-            )
+
+            answer=$(curl -sL "https://models.github.ai/inference/chat/completions" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -d @payload.json | jq -r '.choices[0].message.content' | tr -d '\n')
 
             printf "%-5s  #% -6s  %s | %s\n" "$answer" "$number" "$title" "$url" >> results.txt
             echo "$path" >> .github/models-discussion-cache.txt
@@ -74,3 +74,4 @@ EOF
         with:
           commit_message: "Update models discussion cache"
           file_pattern: .github/models-discussion-cache.txt
+
