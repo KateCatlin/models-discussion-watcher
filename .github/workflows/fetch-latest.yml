@@ -1,4 +1,4 @@
-name: Show Latest Discussion Post
+name: Show Most Recent Models Discussion
 
 on:
   workflow_dispatch:
@@ -9,13 +9,24 @@ jobs:
 
     steps:
       - name: Fetch discussion category page
-        run: |
-          curl -sL "https://github.com/orgs/community/discussions/categories/models" -o page.html
+        run: curl -sL "https://github.com/orgs/community/discussions/categories/models" -o page.html
 
-      - name: Extract most recent discussion link
+      - name: Extract most recent post
         run: |
           echo "Most recent discussion:"
-          grep -Eo '/orgs/community/discussions/[0-9]+' page.html \
-            | sort -u \
-            | head -n 1 \
-            | sed 's|^|https://github.com|'
+
+          # Extract pairs: timestamp + discussion path
+          awk '
+            /relative-time datetime=/ { 
+              match($0, /datetime="([^"]+)"/, dt); 
+              getline; 
+              match($0, /href="([^"]+\/discussions\/[0-9]+)"/, link); 
+              if (dt[1] && link[1]) 
+                print dt[1], link[1] 
+            }' page.html > discussions_with_dates.txt
+
+          # Sort by ISO 8601 timestamp descending and print latest
+          sort -r discussions_with_dates.txt | head -n 1 | while read -r datetime path; do
+            echo "Time: $datetime"
+            echo "URL: https://github.com$path"
+          done
