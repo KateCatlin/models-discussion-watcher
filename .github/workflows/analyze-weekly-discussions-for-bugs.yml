@@ -1,0 +1,241 @@
+name: Analyze Weekly Discussions for Bug Reports
+on:
+  workflow_dispatch:
+
+permissions:
+  models: read
+  contents: read
+
+jobs:
+  analyze-discussions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+      
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Create discussion fetcher script
+        run: |
+          cat > fetch-weekly-discussions.js << 'EOF'
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+
+          (async () => {
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+            
+            try {
+              console.log('Navigating to GitHub discussions...');
+              await page.goto('https://github.com/orgs/community/discussions/categories/models', {
+                waitUntil: 'networkidle',
+                timeout: 30000
+              });
+              
+              // Wait for the discussions to load
+              console.log('Waiting for discussions to load...');
+              await page.waitForSelector('li.Box-row.js-navigation-item', { timeout: 15000 });
+              
+              // Get all discussion items
+              const discussions = await page.$eval('li.Box-row.js-navigation-item', (items) => {
+                return items.map(item => {
+                  // Find the discussion title link
+                  const titleLink = item.querySelector('a.markdown-title.discussion-Link--secondary');
+                  if (!titleLink) return null;
+                  
+                  // Find the author
+                  const authorLink = item.querySelector('a.Link--muted.Link--inTextBlock[href^="/"][aria-label*="author"]');
+                  
+                  // Find the timestamp
+                  const timeElement = item.querySelector('relative-time');
+                  
+                  // Find comment count
+                  const commentLink = item.querySelector('a[aria-label*="comment"]');
+                  const commentCount = commentLink ? commentLink.textContent.trim() : '0';
+                  
+                  return {
+                    title: titleLink.textContent.trim(),
+                    url: titleLink.href,
+                    author: authorLink ? authorLink.textContent.trim() : 'Unknown',
+                    datetime: timeElement ? timeElement.getAttribute('datetime') : null,
+                    timeText: timeElement ? timeElement.textContent.trim() : null,
+                    commentCount: commentCount
+                  };
+                }).filter(item => item !== null);
+              });
+              
+              if (discussions.length === 0) {
+                console.log('No discussions found.');
+                return;
+              }
+              
+              // Calculate date one week ago
+              const oneWeekAgo = new Date();
+              oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+              
+              // Filter discussions from the last week
+              const weeklyDiscussions = discussions.filter(discussion => {
+                if (!discussion.datetime) return false;
+                const discussionDate = new Date(discussion.datetime);
+                return discussionDate >= oneWeekAgo;
+              });
+              
+              console.log(`Found ${weeklyDiscussions.length} discussions from the last week out of ${discussions.length} total`);
+              
+              // For each discussion, we need to get the body content
+              const discussionsWithContent = [];
+              
+              for (const discussion of weeklyDiscussions) {
+                try {
+                  console.log(`Fetching content for: ${discussion.title}`);
+                  await page.goto(discussion.url, { waitUntil: 'networkidle', timeout: 30000 });
+                  
+                  // Wait for discussion content to load
+                  await page.waitForSelector('.js-discussion-timeline', { timeout: 10000 });
+                  
+                  // Get the discussion body
+                  const bodyContent = await page.$eval('.js-discussion-timeline .comment-body', 
+                    (element) => element.textContent.trim()
+                  ).catch(() => 'No body content found');
+                  
+                  discussionsWithContent.push({
+                    ...discussion,
+                    body: bodyContent
+                  });
+                  
+                  // Small delay to be respectful
+                  await page.waitForTimeout(1000);
+                  
+                } catch (error) {
+                  console.error(`Error fetching content for ${discussion.title}:`, error.message);
+                  // Still include the discussion without body content
+                  discussionsWithContent.push({
+                    ...discussion,
+                    body: 'Error fetching content'
+                  });
+                }
+              }
+              
+              // Save discussions to file for analysis
+              fs.writeFileSync('weekly-discussions.json', JSON.stringify(discussionsWithContent, null, 2));
+              
+              console.log('Weekly discussions saved to weekly-discussions.json');
+              
+            } catch (error) {
+              console.error('Error occurred:', error.message);
+              
+              // Debug information
+              try {
+                await page.screenshot({ path: 'debug-screenshot.png' });
+                console.log('Page title:', await page.title());
+                console.log('Current URL:', page.url());
+              } catch (debugError) {
+                console.error('Error during debugging:', debugError.message);
+              }
+              
+              process.exit(1);
+              
+            } finally {
+              await browser.close();
+            }
+          })();
+          EOF
+
+      - name: Fetch weekly discussions
+        run: node fetch-weekly-discussions.js
+
+      - name: Analyze discussions for bug reports
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Read the discussions data
+          DISCUSSIONS=$(cat weekly-discussions.json)
+          
+          # Check if there are any discussions
+          if [ "$(echo "$DISCUSSIONS" | jq 'length')" -eq 0 ]; then
+            echo "No discussions found from the last week."
+            exit 0
+          fi
+          
+          # Create analysis prompt
+          ANALYSIS_PROMPT="Analyze the following GitHub discussions and identify which ones sound like bug reports. For each discussion, provide:
+          1. Whether it's likely a bug report (Yes/No)
+          2. Confidence level (High/Medium/Low)
+          3. Brief reasoning
+          4. Key indicators that suggest it's a bug report
+          
+          Please format your response as JSON with the following structure:
+          {
+            \"summary\": \"Overall summary of findings\",
+            \"total_discussions\": number,
+            \"potential_bug_reports\": number,
+            \"analysis\": [
+              {
+                \"title\": \"Discussion title\",
+                \"is_bug_report\": true/false,
+                \"confidence\": \"High/Medium/Low\",
+                \"reasoning\": \"Brief explanation\",
+                \"indicators\": [\"list of indicators\"]
+              }
+            ]
+          }
+          
+          Here are the discussions to analyze:
+          $DISCUSSIONS"
+          
+          # Call GitHub Models API
+          curl "https://models.github.ai/inference/chat/completions" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -d "{
+              \"messages\": [
+                  {
+                      \"role\": \"system\",
+                      \"content\": \"You are an expert at analyzing GitHub discussions to identify potential bug reports. Look for keywords like 'error', 'bug', 'issue', 'problem', 'not working', 'fails', 'crash', stack traces, version information, steps to reproduce, and expected vs actual behavior.\"
+                  },
+                  {
+                      \"role\": \"user\",
+                      \"content\": $(echo "$ANALYSIS_PROMPT" | jq -R -s .)
+                  }
+              ],
+              \"model\": \"openai/gpt-4o\",
+              \"temperature\": 0.1
+          }" | jq -r '.choices[0].message.content' > analysis-results.json
+
+      - name: Display analysis results
+        run: |
+          echo "=== Bug Report Analysis Results ==="
+          cat analysis-results.json | jq -r '
+            "Summary: " + .summary + "\n" +
+            "Total Discussions Analyzed: " + (.total_discussions | tostring) + "\n" +
+            "Potential Bug Reports Found: " + (.potential_bug_reports | tostring) + "\n" +
+            "\n=== Detailed Analysis ===\n" +
+            (.analysis[] | 
+              "Title: " + .title + "\n" +
+              "Bug Report: " + (.is_bug_report | tostring) + "\n" +
+              "Confidence: " + .confidence + "\n" +
+              "Reasoning: " + .reasoning + "\n" +
+              "Indicators: " + (.indicators | join(", ")) + "\n" +
+              "---"
+            )
+          '
+
+      - name: Save analysis results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bug-report-analysis
+          path: |
+            weekly-discussions.json
+            analysis-results.json
+          retention-days: 30
