@@ -18,6 +18,14 @@ jobs:
           npm init -y
           npm install playwright
 
+      - name: Debug file paths
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Files:"
+          ls -R
+
+
       - name: Run script to get most recent discussion
         run: |
           node scripts/get-latest.js
