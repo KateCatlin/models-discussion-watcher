@@ -1,0 +1,21 @@
+name: Show Latest Discussion Post
+
+on:
+  workflow_dispatch:
+
+jobs:
+  get-latest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch discussion category page
+        run: |
+          curl -sL "https://github.com/orgs/community/discussions/categories/models" -o page.html
+
+      - name: Extract most recent discussion link
+        run: |
+          echo "Most recent discussion:"
+          grep -Eo '/orgs/community/discussions/[0-9]+' page.html \
+            | sort -u \
+            | head -n 1 \
+            | sed 's|^|https://github.com|'
