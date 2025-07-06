@@ -1,0 +1,23 @@
+name: Show Most Recent Discussion with Playwright
+
+on:
+  workflow_dispatch:
+
+jobs:
+  get-latest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+
+      - name: Run script to get most recent discussion
+        run: |
+          node .github/scripts/get-latest.js
