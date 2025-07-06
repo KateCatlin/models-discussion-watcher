@@ -66,6 +66,7 @@ EOF
             echo "$path" >> .github/models-discussion-cache.txt
           done < new_discussions.txt
 
+
       - name: Print results
         run: cat results.txt
 
