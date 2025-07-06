@@ -8,6 +8,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -17,14 +20,6 @@ jobs:
         run: |
           npm init -y
           npm install playwright
-
-      - name: Debug file paths
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo "Files:"
-          ls -R
-
 
       - name: Run script to get most recent discussion
         run: |
