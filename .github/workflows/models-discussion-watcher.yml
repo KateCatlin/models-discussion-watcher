@@ -42,20 +42,18 @@ jobs:
           printf "%-5s  %-8s  %s\n" "-----" "-------" "------------------------" >> results.txt
 
           while read -r path; do
-            [ -z "$path" ] && continue  # skip blank lines
+            [ -z "$path" ] && continue
             number="${path##*/}"
             url="https://github.com${path}"
             title=$(curl -sL "$url" | sed -n 's/^[[:space:]]*<title>\(.*\)<\/title>/\1/p' | head -n1)
 
-            cat > payload.json <<EOF
-{
-  "messages": [
-    { "role": "system", "content": "Return ONLY YES or NO." },
-    { "role": "user", "content": "Does the following GitHub Discussion title sound like a bug report?\n\n\"$title\"" }
-  ],
-  "model": "openai/gpt-4o"
-}
-EOF
+            jq -n \
+              --arg title "$title" \
+              --arg model "openai/gpt-4o" \
+              '{model: $model, messages: [
+                  {role: "system", content: "Return ONLY YES or NO."},
+                  {role: "user", content: "Does the following GitHub Discussion title sound like a bug report?\n\n\"\($title)\""}
+              ]}' > payload.json
 
             answer=$(curl -sL "https://models.github.ai/inference/chat/completions" \
               -H "Content-Type: application/json" \
