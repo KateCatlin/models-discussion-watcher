@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -21,6 +21,8 @@ jobs:
           npm init -y
           npm install playwright
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
       - name: Run script to get most recent discussion
-        run: |
-          node scripts/get-latest.js
+        run: node scripts/get-latest.js
