@@ -1,0 +1,28 @@
+name: Fetch Latest and Analyze
+
+on:
+  workflow_dispatch:
+
+jobs:
+  get-latest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run script to analyze discussions
+        run: node scripts/analyze-discussions.js
