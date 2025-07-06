@@ -20,4 +20,4 @@ jobs:
 
       - name: Run script to get most recent discussion
         run: |
-          node .github/scripts/get-latest.js
+          node scripts/get-latest.js
