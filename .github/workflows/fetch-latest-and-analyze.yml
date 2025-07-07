@@ -2,10 +2,13 @@ name: Fetch Latest and Analyze
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Run every day at midnight UTC
 
 permissions:
   models: read
   contents: read
+  issues: write  # Added permission to create issues
 
 jobs:
   fetch-and-analyze:
@@ -234,9 +237,109 @@ jobs:
             echo ""
             echo "========================================"
             
+            # Save AI analysis for next step
+            echo "$AI_ANALYSIS" > ai_analysis.json
+            
             # Clean up
             rm -f analysis_prompt.txt
             
           else
             echo "No discussions.json file found. Skipping analysis."
           fi
+
+      - name: Create GitHub issues for bug reports
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Check if analysis file exists
+            if (!fs.existsSync('ai_analysis.json')) {
+              console.log('No AI analysis file found. Skipping issue creation.');
+              return;
+            }
+            
+            // Read the AI analysis results
+            let aiAnalysis;
+            try {
+              const aiData = fs.readFileSync('ai_analysis.json', 'utf8');
+              aiAnalysis = JSON.parse(aiData);
+            } catch (error) {
+              console.log('Could not parse AI analysis file. Skipping issue creation.');
+              console.log('Error:', error.message);
+              return;
+            }
+            
+            // Read original discussions data
+            let discussions = [];
+            if (fs.existsSync('discussions.json')) {
+              try {
+                const discussionData = fs.readFileSync('discussions.json', 'utf8');
+                discussions = JSON.parse(discussionData);
+              } catch (error) {
+                console.log('Could not parse discussions file:', error.message);
+              }
+            }
+            
+            // Filter for bug reports
+            const bugReports = aiAnalysis.filter(item => item.classification === 'BUG_REPORT');
+            
+            if (bugReports.length === 0) {
+              console.log('✅ No bug reports detected. No issues to create.');
+              return;
+            }
+            
+            console.log(`🐛 Creating ${bugReports.length} GitHub issues for detected bug reports...`);
+            
+            // Create issues for each bug report
+            for (const bugReport of bugReports) {
+              try {
+                // Find the corresponding discussion for additional details
+                const originalDiscussion = discussions.find(d => d.title === bugReport.title);
+                
+                // Create issue title
+                const issueTitle = `[Auto-detected Bug] ${bugReport.title}`;
+                
+                // Create issue body
+                const issueBody = `## Auto-detected Bug Report
+            
+            This issue was automatically created based on AI analysis of a GitHub discussion in the Models category.
+            
+            **Original Discussion:** ${originalDiscussion ? originalDiscussion.url : 'URL not found'}
+            **AI Confidence:** ${bugReport.confidence}%
+            **Analysis:** ${bugReport.reasoning}
+            
+            ### Discussion Details
+            ${originalDiscussion ? `
+            - **Author:** ${originalDiscussion.author}
+            - **Date:** ${originalDiscussion.timeText}
+            - **Comments:** ${originalDiscussion.commentCount}
+            ` : 'Details not available'}
+            
+            ### Next Steps
+            - [ ] Review the original discussion for more context
+            - [ ] Verify if this is actually a bug
+            - [ ] Determine if this is a duplicate of an existing issue
+            - [ ] Take appropriate action (fix, document, close, etc.)
+            
+            ---
+            *This issue was automatically created by the GitHub Models Discussion Watcher workflow.*`;
+                
+                // Create the issue
+                const issue = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issueTitle,
+                  body: issueBody,
+                  labels: ['auto-detected', 'bug-report', 'needs-triage']
+                });
+                
+                console.log(`✅ Created issue #${issue.data.number}: ${issueTitle}`);
+                
+              } catch (error) {
+                console.log(`❌ Failed to create issue for "${bugReport.title}":`, error.message);
+              }
+            }
+            
+            console.log('🎉 Issue creation process completed!');
