@@ -3,7 +3,7 @@ name: Fetch Latest and Analyze
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # Run every day at midnight UTC
+    - cron: '0 16 * * *'  # Run every day at 4:00 PM UTC
 
 permissions:
   models: read
@@ -51,7 +51,7 @@ jobs:
             
             # Check if there are any discussions
             if [ "$(echo "$DISCUSSIONS" | jq 'length')" -eq 0 ]; then
-              echo "No discussions found from the last 30 days."
+              echo "No discussions found from the last 24 hours."
               exit 0
             fi
             
@@ -160,7 +160,7 @@ jobs:
               DISCUSSION_COUNT=$(echo "$AI_ANALYSIS" | jq '[.[] | select(.classification == "DISCUSSION")] | length')
               TOTAL_COUNT=$(echo "$AI_ANALYSIS" | jq 'length')
               
-              echo "� SUMMARY (Last 30 Days)"
+              echo "📊 SUMMARY (Last 24 Hours)"
               echo "─────────────────────────"
               echo "�🐛 Bug Reports: $BUG_COUNT"
               echo "✨ Feature Requests: $FEATURE_COUNT"

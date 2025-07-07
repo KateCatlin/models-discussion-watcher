@@ -77,22 +77,22 @@ const fs = require('fs');
       return 0;
     });
     
-    // Calculate date 30 days ago for filtering
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Calculate date 24 hours ago for filtering
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
     
-    // Filter discussions from the last 30 days
+    // Filter discussions from the last 24 hours
     const recentDiscussions = discussions.filter(discussion => {
       if (!discussion.datetime) return false;
       const discussionDate = new Date(discussion.datetime);
-      return discussionDate >= thirtyDaysAgo;
+      return discussionDate >= twentyFourHoursAgo;
     });
     
-    console.log(`Found ${recentDiscussions.length} discussions from the last 30 days out of ${discussions.length} total`);
-    console.log('Date range:', thirtyDaysAgo.toISOString(), 'to', new Date().toISOString());
+    console.log(`Found ${recentDiscussions.length} discussions from the last 24 hours out of ${discussions.length} total`);
+    console.log('Date range:', twentyFourHoursAgo.toISOString(), 'to', new Date().toISOString());
     
     if (recentDiscussions.length === 0) {
-      console.log('No discussions found from the last 30 days.');
+      console.log('No discussions found from the last 24 hours.');
       // Still save an empty array to discussions.json
       fs.writeFileSync('discussions.json', JSON.stringify([], null, 2));
       console.log('Saved empty discussions array to discussions.json');
@@ -106,7 +106,7 @@ const fs = require('fs');
     // Show basic info about the most recent discussion
     if (recentDiscussions.length > 0) {
       const latest = recentDiscussions[0];
-      console.log('\n=== MOST RECENT DISCUSSION (LAST 30 DAYS) ===');
+      console.log('\n=== MOST RECENT DISCUSSION (LAST 24 HOURS) ===');
       console.log(`Title: ${latest.title}`);
       console.log(`Author: ${latest.author}`);
       console.log(`Time: ${latest.datetime} (${latest.timeText || 'no relative time'})`);
