@@ -27,14 +27,22 @@ jobs:
       - name: Run script to fetch discussions
         run: node scripts/analyze-discussions.js
 
-      - name: Analyze weekly discussions with AI classification
+      - name: Analyze recent discussions with AI classification
         run: |
-          # Read the weekly discussions data
+          # Check if discussions.json exists
+          if [ ! -f "discussions.json" ]; then
+            echo "discussions.json file not found. The fetching step may have failed."
+            exit 1
+          fi
+          
+          # Read the recent discussions data
           DISCUSSIONS=$(cat discussions.json)
           
-          # Check if there are any weekly discussions
+          # Check if there are any recent discussions
           if [ "$(echo "$DISCUSSIONS" | jq 'length')" -eq 0 ]; then
-            echo "No discussions found from the last week."
+            echo "No discussions found from the last 30 days. This may be normal if there haven't been any new discussions recently."
+            echo "Creating empty analysis results..."
+            echo '{"message": "No recent discussions found", "analyzed_discussions": []}' > analyzed-discussions.json
             exit 0
           fi
           
@@ -131,7 +139,7 @@ jobs:
           
           const latest = analyzedDiscussions[0];
           
-          console.log('=== MOST RECENT WEEKLY DISCUSSION ===');
+          console.log('=== MOST RECENT DISCUSSION (LAST 30 DAYS) ===');
           console.log(`Title: ${latest.title}`);
           console.log(`Author: ${latest.author}`);
           console.log(`Time: ${latest.datetime} (${latest.timeText || 'no relative time'})`);
@@ -139,7 +147,7 @@ jobs:
           console.log(`Classification: ${latest.analysis.classification} (${latest.analysis.confidence}% confidence)`);
           console.log(`URL: ${latest.url}`);
           
-          console.log('\n=== WEEKLY DISCUSSIONS AI ANALYSIS SUMMARY ===');
+          console.log('\n=== RECENT DISCUSSIONS AI ANALYSIS SUMMARY ===');
           const bugReports = analyzedDiscussions.filter(d => d.analysis.classification === 'bug_report');
           const featureRequests = analyzedDiscussions.filter(d => d.analysis.classification === 'feature_request');
           const questions = analyzedDiscussions.filter(d => d.analysis.classification === 'question');
@@ -150,7 +158,7 @@ jobs:
           console.log(`Questions: ${questions.length}`);
           console.log(`Other Discussions: ${other.length}`);
           
-          console.log('\n=== BUG REPORTS IDENTIFIED (LAST WEEK) ===');
+          console.log('\n=== BUG REPORTS IDENTIFIED (LAST 30 DAYS) ===');
           if (bugReports.length > 0) {
             bugReports.forEach((disc, i) => {
               console.log(`${i + 1}. ${disc.title}`);
@@ -160,10 +168,10 @@ jobs:
               console.log('');
             });
           } else {
-            console.log('No bug reports identified in discussions from the last week.');
+            console.log('No bug reports identified in discussions from the last 30 days.');
           }
           
-          console.log('\n=== ALL WEEKLY DISCUSSIONS WITH ANALYSIS ===');
+          console.log('\n=== ALL RECENT DISCUSSIONS WITH ANALYSIS ===');
           analyzedDiscussions.slice(0, 10).forEach((disc, i) => {
             const classificationEmoji = {
               'bug_report': '🐛',
