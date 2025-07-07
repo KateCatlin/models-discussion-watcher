@@ -226,25 +226,6 @@ jobs:
                 echo ""
               fi
               
-              # Show most recent discussion details
-              echo "🔍 MOST RECENT DISCUSSION"
-              echo "──────────────────────────"
-              LATEST_TITLE=$(echo "$DISCUSSIONS" | jq -r '.[0].title')
-              LATEST_AUTHOR=$(echo "$DISCUSSIONS" | jq -r '.[0].author')
-              LATEST_TIME=$(echo "$DISCUSSIONS" | jq -r '.[0].timeText')
-              LATEST_COMMENTS=$(echo "$DISCUSSIONS" | jq -r '.[0].commentCount')
-              LATEST_URL=$(echo "$DISCUSSIONS" | jq -r '.[0].url')
-              
-              echo "📝 Title: $LATEST_TITLE"
-              echo "👤 Author: $LATEST_AUTHOR"
-              echo "📅 Time: $LATEST_TIME"
-              echo "💬 Comments: $LATEST_COMMENTS"
-              echo "🔗 URL: $LATEST_URL"
-              echo ""
-              
-              # Show AI analysis of the latest discussion
-              echo "$AI_ANALYSIS" | jq -r --arg title "$LATEST_TITLE" '.[] | select(.title == $title) | "🤖 AI Classification: \(.classification)\n🎯 Confidence: \(.confidence)%\n💭 Reasoning: \(.reasoning)"'
-              
             else
               echo "❌ Could not parse AI analysis. Raw response:"
               echo "$AI_ANALYSIS"
