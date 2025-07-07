@@ -170,7 +170,17 @@ jobs:
               echo "🐛 BUG REPORTS DETECTED"
               echo "─────────────────────────"
               if [ "$BUG_COUNT" -gt 0 ]; then
-                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "BUG_REPORT") | "• \(.title) (\(.confidence)% confidence)\n  💭 \(.reasoning)\n  🔗 " + (if .url then .url else "URL not available" end) + "\n"'
+                # Get bug report titles and add URLs from original discussions
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "BUG_REPORT") | .title' | while read -r title; do
+                  confidence=$(echo "$AI_ANALYSIS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .confidence')
+                  reasoning=$(echo "$AI_ANALYSIS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .reasoning')
+                  url=$(echo "$DISCUSSIONS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .url')
+                  
+                  echo "• $title ($confidence% confidence)"
+                  echo "  💭 $reasoning"
+                  echo "  🔗 $url"
+                  echo ""
+                done
               else
                 echo "✅ No bug reports identified in recent discussions."
                 echo ""
@@ -183,21 +193,36 @@ jobs:
               # Feature Requests
               if [ "$FEATURE_COUNT" -gt 0 ]; then
                 echo "✨ Feature Requests:"
-                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "FEATURE_REQUEST") | "  • \(.title) (\(.confidence)% confidence)"'
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "FEATURE_REQUEST") | .title' | while read -r title; do
+                  confidence=$(echo "$AI_ANALYSIS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .confidence')
+                  url=$(echo "$DISCUSSIONS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .url')
+                  echo "  • $title ($confidence% confidence)"
+                  echo "    🔗 $url"
+                done
                 echo ""
               fi
               
               # Questions
               if [ "$QUESTION_COUNT" -gt 0 ]; then
                 echo "❓ Questions:"
-                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "QUESTION") | "  • \(.title) (\(.confidence)% confidence)"'
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "QUESTION") | .title' | while read -r title; do
+                  confidence=$(echo "$AI_ANALYSIS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .confidence')
+                  url=$(echo "$DISCUSSIONS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .url')
+                  echo "  • $title ($confidence% confidence)"
+                  echo "    🔗 $url"
+                done
                 echo ""
               fi
               
               # General Discussions
               if [ "$DISCUSSION_COUNT" -gt 0 ]; then
                 echo "💬 General Discussions:"
-                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "DISCUSSION") | "  • \(.title) (\(.confidence)% confidence)"'
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "DISCUSSION") | .title' | while read -r title; do
+                  confidence=$(echo "$AI_ANALYSIS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .confidence')
+                  url=$(echo "$DISCUSSIONS" | jq -r --arg title "$title" '.[] | select(.title == $title) | .url')
+                  echo "  • $title ($confidence% confidence)"
+                  echo "    🔗 $url"
+                done
                 echo ""
               fi
               
