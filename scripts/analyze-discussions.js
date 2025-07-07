@@ -74,11 +74,36 @@ const fs = require('fs');
       return 0;
     });
     
-    // Save discussions to JSON file for analysis
-    fs.writeFileSync('discussions.json', JSON.stringify(discussions, null, 2));
+    // Calculate date one week ago
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     
-    console.log(`Fetched ${discussions.length} discussions and saved to discussions.json`);
-    console.log('Most recent discussion:', discussions[0]?.title || 'None found');
+    // Filter discussions from the last week
+    const weeklyDiscussions = discussions.filter(discussion => {
+      if (!discussion.datetime) return false;
+      const discussionDate = new Date(discussion.datetime);
+      return discussionDate >= oneWeekAgo;
+    });
+    
+    console.log(`Found ${weeklyDiscussions.length} discussions from the last week out of ${discussions.length} total`);
+    
+    // Save only weekly discussions to JSON file for analysis
+    fs.writeFileSync('discussions.json', JSON.stringify(weeklyDiscussions, null, 2));
+    
+    console.log(`Fetched ${weeklyDiscussions.length} weekly discussions and saved to discussions.json`);
+    console.log('Most recent weekly discussion:', weeklyDiscussions[0]?.title || 'None found');
+    
+    if (weeklyDiscussions.length === 0) {
+      console.log('No discussions found from the last week.');
+    } else {
+      console.log('\n=== WEEKLY DISCUSSIONS TO ANALYZE ===');
+      weeklyDiscussions.slice(0, 5).forEach((disc, i) => {
+        console.log(`${i + 1}. ${disc.title}`);
+        console.log(`   By: ${disc.author} | ${disc.timeText || disc.datetime} | ${disc.commentCount} comments`);
+        console.log(`   ${disc.url}`);
+        console.log('');
+      });
+    }
     
   } catch (error) {
     console.error('Error occurred:', error.message);
