@@ -90,62 +90,12 @@ jobs:
             PROMPT=$(cat analysis_prompt.txt)
             
             # Call GitHub Models API with GPT-4o
-            echo "Calling GPT-4o for analysis..."
+            echo "🤖 Analyzing discussions with AI..."
             
-            # Debug: Check if we have a token
+            # Check if we have a token (simplified)
             if [ -z "$GITHUB_TOKEN" ]; then
               echo "ERROR: GITHUB_TOKEN is not set"
               exit 1
-            fi
-            
-            echo "Token length: ${#GITHUB_TOKEN}"
-            echo "Making API request to GitHub Models..."
-            
-            # First, test with a simple request using correct endpoint
-            echo "Testing API with simple request..."
-            TEST_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}\n" "https://models.github.ai/inference/chat/completions" \
-              -H "Accept: application/vnd.github+json" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              -d '{
-                "model": "openai/gpt-4.1",
-                "messages": [
-                  {
-                    "role": "user",
-                    "content": "Hello, respond with just SUCCESS"
-                  }
-                ]
-              }')
-            
-            TEST_STATUS=$(echo "$TEST_RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
-            TEST_API_RESPONSE=$(echo "$TEST_RESPONSE" | sed '/HTTP_STATUS:/d')
-            
-            echo "Test HTTP Status: $TEST_STATUS"
-            echo "Test Response: $TEST_API_RESPONSE"
-            
-            if [ "$TEST_STATUS" != "200" ]; then
-              echo "API test failed. Trying GPT-4o model..."
-              TEST_RESPONSE2=$(curl -s -w "\nHTTP_STATUS:%{http_code}\n" "https://models.github.ai/inference/chat/completions" \
-                -H "Accept: application/vnd.github+json" \
-                -H "Content-Type: application/json" \
-                -H "Authorization: Bearer $GITHUB_TOKEN" \
-                -H "X-GitHub-Api-Version: 2022-11-28" \
-                -d '{
-                  "model": "openai/gpt-4o",
-                  "messages": [
-                    {
-                      "role": "user",
-                      "content": "Hello, respond with just SUCCESS"
-                    }
-                  ]
-                }')
-              
-              TEST_STATUS2=$(echo "$TEST_RESPONSE2" | grep "HTTP_STATUS:" | cut -d: -f2)
-              TEST_API_RESPONSE2=$(echo "$TEST_RESPONSE2" | sed '/HTTP_STATUS:/d')
-              
-              echo "Test 2 HTTP Status: $TEST_STATUS2"
-              echo "Test 2 Response: $TEST_API_RESPONSE2"
             fi
             
             # Use the correct API endpoint and model format
@@ -168,98 +118,115 @@ jobs:
             HTTP_STATUS=$(echo "$AI_RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
             API_RESPONSE=$(echo "$AI_RESPONSE" | sed '/HTTP_STATUS:/d')
             
-            echo "HTTP Status: $HTTP_STATUS"
-            echo "Full API Response (first 500 chars): $(echo "$API_RESPONSE" | head -c 500)"
-            
             # Check if the request was successful
             if [ "$HTTP_STATUS" != "200" ]; then
-              echo "API request failed with status $HTTP_STATUS"
-              echo "Response: $API_RESPONSE"
+              echo "❌ AI API request failed. Using fallback analysis..."
               
-              # Try alternative model or endpoint
-              echo "Trying alternative model (gpt-4.1)..."
-              AI_RESPONSE_ALT=$(curl -s -w "\nHTTP_STATUS:%{http_code}\n" "https://models.github.ai/inference/chat/completions" \
-                -H "Accept: application/vnd.github+json" \
-                -H "Content-Type: application/json" \
-                -H "Authorization: Bearer $GITHUB_TOKEN" \
-                -H "X-GitHub-Api-Version: 2022-11-28" \
-                -d "{
-                  \"model\": \"openai/gpt-4.1\",
-                  \"messages\": [
-                    {
-                      \"role\": \"user\",
-                      \"content\": $(echo "$PROMPT" | jq -Rs .)
-                    }
-                  ]
-                }")
-              
-              HTTP_STATUS_ALT=$(echo "$AI_RESPONSE_ALT" | grep "HTTP_STATUS:" | cut -d: -f2)
-              API_RESPONSE_ALT=$(echo "$AI_RESPONSE_ALT" | sed '/HTTP_STATUS:/d')
-              
-              echo "Alternative HTTP Status: $HTTP_STATUS_ALT"
-              echo "Alternative API Response: $API_RESPONSE_ALT"
-              
-              if [ "$HTTP_STATUS_ALT" = "200" ]; then
-                AI_ANALYSIS=$(echo "$API_RESPONSE_ALT" | jq -r '.choices[0].message.content')
-                echo "Successfully used alternative endpoint"
-              else
-                echo "Both API endpoints failed. Using fallback keyword analysis..."
-                
-                # Fallback to keyword-based analysis
-                AI_ANALYSIS=$(echo "$DISCUSSIONS" | jq -r '[.[] | {
-                  "title": .title,
-                  "classification": (if (.title | ascii_downcase | test("bug|error|issue|problem|broken|not working|fail|crash|exception|wrong|incorrect")) then "BUG_REPORT"
-                    elif (.title | ascii_downcase | test("feature|request|enhancement|improvement|add|support")) then "FEATURE_REQUEST"  
-                    elif (.title | ascii_downcase | test("how to|question|help|documentation|guide|usage")) then "QUESTION"
-                    else "DISCUSSION" end),
-                  "confidence": (if (.title | ascii_downcase | test("bug|error|crash")) then 80
-                    elif (.title | ascii_downcase | test("issue|problem|broken")) then 70
-                    elif (.title | ascii_downcase | test("feature|request")) then 75
-                    elif (.title | ascii_downcase | test("how to|question")) then 65
-                    else 50 end),
-                  "reasoning": "Classified using keyword analysis as GitHub Models API is not available."
-                }]')
-                
-                echo "Using fallback keyword analysis"
-              fi
+              # Fallback to keyword-based analysis
+              AI_ANALYSIS=$(echo "$DISCUSSIONS" | jq -r '[.[] | {
+                "title": .title,
+                "classification": (if (.title | ascii_downcase | test("bug|error|issue|problem|broken|not working|fail|crash|exception|wrong|incorrect")) then "BUG_REPORT"
+                  elif (.title | ascii_downcase | test("feature|request|enhancement|improvement|add|support")) then "FEATURE_REQUEST"  
+                  elif (.title | ascii_downcase | test("how to|question|help|documentation|guide|usage")) then "QUESTION"
+                  else "DISCUSSION" end),
+                "confidence": (if (.title | ascii_downcase | test("bug|error|crash")) then 80
+                  elif (.title | ascii_downcase | test("issue|problem|broken")) then 70
+                  elif (.title | ascii_downcase | test("feature|request")) then 75
+                  elif (.title | ascii_downcase | test("how to|question")) then 65
+                  else 50 end),
+                "reasoning": "Classified using keyword analysis."
+              }]')
             else
-              # Extract AI response content
-              AI_ANALYSIS=$(echo "$API_RESPONSE" | jq -r '.choices[0].message.content')
+              # Extract AI response content and clean it
+              AI_ANALYSIS=$(echo "$API_RESPONSE" | jq -r '.choices[0].message.content' | sed 's/```json//g' | sed 's/```//g' | sed '/^$/d')
             fi
             
-            echo "=== AI ANALYSIS RESULTS ==="
-            echo "$AI_ANALYSIS"
+            echo ""
+            echo "========================================"
+            echo "🤖 GITHUB DISCUSSIONS ANALYSIS REPORT"
+            echo "========================================"
+            echo ""
             
             # Parse AI analysis and create summary
-            echo -e "\n=== ANALYSIS SUMMARY ==="
-            
-            # Try to extract JSON and create summary
             if echo "$AI_ANALYSIS" | jq -e . >/dev/null 2>&1; then
-              echo "Processing AI analysis..."
               
+              # Get counts for each category
               BUG_COUNT=$(echo "$AI_ANALYSIS" | jq '[.[] | select(.classification == "BUG_REPORT")] | length')
               FEATURE_COUNT=$(echo "$AI_ANALYSIS" | jq '[.[] | select(.classification == "FEATURE_REQUEST")] | length')
               QUESTION_COUNT=$(echo "$AI_ANALYSIS" | jq '[.[] | select(.classification == "QUESTION")] | length')
               DISCUSSION_COUNT=$(echo "$AI_ANALYSIS" | jq '[.[] | select(.classification == "DISCUSSION")] | length')
+              TOTAL_COUNT=$(echo "$AI_ANALYSIS" | jq 'length')
               
-              echo "🐛 Bug Reports: $BUG_COUNT"
+              echo "� SUMMARY (Last 30 Days)"
+              echo "─────────────────────────"
+              echo "�🐛 Bug Reports: $BUG_COUNT"
               echo "✨ Feature Requests: $FEATURE_COUNT"
               echo "❓ Questions: $QUESTION_COUNT"
               echo "💬 General Discussions: $DISCUSSION_COUNT"
+              echo "📝 Total Discussions: $TOTAL_COUNT"
+              echo ""
               
-              # Show bug reports in detail
-              echo -e "\n=== IDENTIFIED BUG REPORTS ==="
-              echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "BUG_REPORT") | "🐛 \(.title) (Confidence: \(.confidence)%)\n   Reasoning: \(.reasoning)\n"'
+              # Show bug reports section
+              echo "🐛 BUG REPORTS DETECTED"
+              echo "─────────────────────────"
+              if [ "$BUG_COUNT" -gt 0 ]; then
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "BUG_REPORT") | "• \(.title) (\(.confidence)% confidence)\n  💭 \(.reasoning)\n  🔗 " + (if .url then .url else "URL not available" end) + "\n"'
+              else
+                echo "✅ No bug reports identified in recent discussions."
+                echo ""
+              fi
               
-              # Show most recent discussion analysis
-              echo -e "\n=== MOST RECENT DISCUSSION ANALYSIS ==="
+              # Show all other discussions organized
+              echo "📋 OTHER RECENT DISCUSSIONS"
+              echo "─────────────────────────────"
+              
+              # Feature Requests
+              if [ "$FEATURE_COUNT" -gt 0 ]; then
+                echo "✨ Feature Requests:"
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "FEATURE_REQUEST") | "  • \(.title) (\(.confidence)% confidence)"'
+                echo ""
+              fi
+              
+              # Questions
+              if [ "$QUESTION_COUNT" -gt 0 ]; then
+                echo "❓ Questions:"
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "QUESTION") | "  • \(.title) (\(.confidence)% confidence)"'
+                echo ""
+              fi
+              
+              # General Discussions
+              if [ "$DISCUSSION_COUNT" -gt 0 ]; then
+                echo "💬 General Discussions:"
+                echo "$AI_ANALYSIS" | jq -r '.[] | select(.classification == "DISCUSSION") | "  • \(.title) (\(.confidence)% confidence)"'
+                echo ""
+              fi
+              
+              # Show most recent discussion details
+              echo "🔍 MOST RECENT DISCUSSION"
+              echo "──────────────────────────"
               LATEST_TITLE=$(echo "$DISCUSSIONS" | jq -r '.[0].title')
-              echo "$AI_ANALYSIS" | jq -r --arg title "$LATEST_TITLE" '.[] | select(.title == $title) | "Title: \(.title)\nClassification: \(.classification)\nConfidence: \(.confidence)%\nReasoning: \(.reasoning)"'
+              LATEST_AUTHOR=$(echo "$DISCUSSIONS" | jq -r '.[0].author')
+              LATEST_TIME=$(echo "$DISCUSSIONS" | jq -r '.[0].timeText')
+              LATEST_COMMENTS=$(echo "$DISCUSSIONS" | jq -r '.[0].commentCount')
+              LATEST_URL=$(echo "$DISCUSSIONS" | jq -r '.[0].url')
+              
+              echo "📝 Title: $LATEST_TITLE"
+              echo "👤 Author: $LATEST_AUTHOR"
+              echo "📅 Time: $LATEST_TIME"
+              echo "💬 Comments: $LATEST_COMMENTS"
+              echo "🔗 URL: $LATEST_URL"
+              echo ""
+              
+              # Show AI analysis of the latest discussion
+              echo "$AI_ANALYSIS" | jq -r --arg title "$LATEST_TITLE" '.[] | select(.title == $title) | "🤖 AI Classification: \(.classification)\n🎯 Confidence: \(.confidence)%\n💭 Reasoning: \(.reasoning)"'
               
             else
-              echo "Could not parse AI response as JSON. Raw response:"
+              echo "❌ Could not parse AI analysis. Raw response:"
               echo "$AI_ANALYSIS"
             fi
+            
+            echo ""
+            echo "========================================"
             
             # Clean up
             rm -f analysis_prompt.txt
