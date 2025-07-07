@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
 
 (async () => {
   const browser = await chromium.launch();
@@ -62,6 +63,9 @@ const { chromium } = require('playwright');
       );
       console.log('Any discussion links found:', anyDiscussionLinks);
       
+      // Still save an empty array to discussions.json
+      fs.writeFileSync('discussions.json', JSON.stringify([], null, 2));
+      console.log('Saved empty discussions array to discussions.json');
       return;
     }
     
@@ -73,22 +77,42 @@ const { chromium } = require('playwright');
       return 0;
     });
     
-    const latest = discussions[0];
+    // Calculate date 30 days ago for filtering
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    console.log('=== MOST RECENT DISCUSSION ===');
-    console.log(`Title: ${latest.title}`);
-    console.log(`Author: ${latest.author}`);
-    console.log(`Time: ${latest.datetime} (${latest.timeText || 'no relative time'})`);
-    console.log(`Comments: ${latest.commentCount}`);
-    console.log(`URL: ${latest.url}`);
-    
-    console.log('\n=== ALL RECENT DISCUSSIONS ===');
-    discussions.slice(0, 5).forEach((disc, i) => {
-      console.log(`${i + 1}. ${disc.title}`);
-      console.log(`   By: ${disc.author} | ${disc.timeText || disc.datetime} | ${disc.commentCount} comments`);
-      console.log(`   ${disc.url}`);
-      console.log('');
+    // Filter discussions from the last 30 days
+    const recentDiscussions = discussions.filter(discussion => {
+      if (!discussion.datetime) return false;
+      const discussionDate = new Date(discussion.datetime);
+      return discussionDate >= thirtyDaysAgo;
     });
+    
+    console.log(`Found ${recentDiscussions.length} discussions from the last 30 days out of ${discussions.length} total`);
+    console.log('Date range:', thirtyDaysAgo.toISOString(), 'to', new Date().toISOString());
+    
+    if (recentDiscussions.length === 0) {
+      console.log('No discussions found from the last 30 days.');
+      // Still save an empty array to discussions.json
+      fs.writeFileSync('discussions.json', JSON.stringify([], null, 2));
+      console.log('Saved empty discussions array to discussions.json');
+      return;
+    }
+
+    // Save the filtered discussions to JSON file
+    fs.writeFileSync('discussions.json', JSON.stringify(recentDiscussions, null, 2));
+    console.log(`Saved ${recentDiscussions.length} discussions to discussions.json`);
+    
+    // Show basic info about the most recent discussion
+    if (recentDiscussions.length > 0) {
+      const latest = recentDiscussions[0];
+      console.log('\n=== MOST RECENT DISCUSSION (LAST 30 DAYS) ===');
+      console.log(`Title: ${latest.title}`);
+      console.log(`Author: ${latest.author}`);
+      console.log(`Time: ${latest.datetime} (${latest.timeText || 'no relative time'})`);
+      console.log(`Comments: ${latest.commentCount}`);
+      console.log(`URL: ${latest.url}`);
+    }
     
   } catch (error) {
     console.error('Error occurred:', error.message);
@@ -106,6 +130,10 @@ const { chromium } = require('playwright');
     } catch (debugError) {
       console.error('Error during debugging:', debugError.message);
     }
+    
+    // Save an empty array on error
+    fs.writeFileSync('discussions.json', JSON.stringify([], null, 2));
+    console.log('Saved empty discussions array to discussions.json due to error');
     
   } finally {
     await browser.close();
