@@ -1,4 +1,4 @@
-name: Fetch Latest and Analyze
+name: AI Bug Detection in Community Discussions
 
 on:
   workflow_dispatch:
