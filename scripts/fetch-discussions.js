@@ -7,7 +7,7 @@ const fs = require('fs');
   
   try {
     console.log('Navigating to GitHub discussions...');
-    await page.goto('https://github.com/orgs/community/discussions/categories/models', {
+    await page.goto('https://github.com/orgs/community/discussions/categories/copilot-news-and-announcements', {
       waitUntil: 'networkidle',
       timeout: 30000
     });
