@@ -1,12 +1,12 @@
 # 🐛 models-discussion-watcher
 
-This GitHub Action monitors the public [GitHub Models Community Discussions](https://github.com/orgs/community/discussions/categories/models) and uses **GitHub Models AI** to detect posts that may contain bug reports. If a potential bug is found, the Action automatically opens a GitHub Issue for the team to triage.
+This GitHub Action monitors the public [GitHub Copilot News and Announcements Discussions](https://github.com/orgs/community/discussions/categories/copilot-news-and-announcements) and uses **GitHub Models AI** to detect posts that may contain bug reports. If a potential bug is found, the Action automatically opens a GitHub Issue for the team to triage.
 
 ---
 
 ## 🔍 What it does
 
-* Scrapes the **Models** category in GitHub Discussions
+* Scrapes the **Copilot News and Announcements** category in GitHub Discussions
 * Uses `openai/gpt-4o` via [GitHub Models](https://docs.github.com/en/rest/models?apiVersion=2022-11-28) to classify each post as:
 
   * `BUG_REPORT`
